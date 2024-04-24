@@ -36,7 +36,7 @@ function LangStore {
                 )
                 Main              = @(
                     "`n[+] ¡Felicidades! Tienes los programas necesarios para desplegar el laboratorio.`n",
-                    "Parametros`n",
+                    "`n`nParametros`n",
                     "`n[-] Parametro no indicado.`n",
                     "`n[-] El parámetro indicado no existe.`n"
                 )

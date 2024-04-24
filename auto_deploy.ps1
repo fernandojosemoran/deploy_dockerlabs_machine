@@ -1,5 +1,6 @@
 Import-Module .\lengStore.ps1 -Force
 Import-Module .\bin\wsl.ps1 -Force
+Import-Module .\bin\docker.ps1 -Force
 
 $banner = "
    
@@ -25,22 +26,25 @@ $banner = "
 
 Write-Host $Banner -ForegroundColor "Blue"
 
-if (
-      ($args[0].ToLower() -eq $null -and $args[1] -eq $null) -or 
-      ($args[0].ToLower() -eq "--run") -or 
-      ($args[0].ToLower() -eq "--remove") -or 
-      ($args[0].ToLower() -eq "--test")
-) {
+[array]$Language = LangStore -Language "en" 
+
+if ($args.Count -eq 0) {
    function ShowGuide {
       Write-Output "`nUse --> ./auto_deploy.ps1 <file.tar> -parameter `n"
-      
-      Write-Output "`nYou have a optional parameter.`n"
+         
+      Write-Host "`nYou have a optional parameter." -ForegroundColor "Blue"
       Write-Output "`nUse --> ./auto_deploy.ps1 <file.tar> -parameter -leng=(es,en)`n"
+      exit
    }
    ShowGuide
+}
+
+if ($args.Count -eq 1) {
+   Write-Host $Language.Main[2] -ForegroundColor "Red"
    exit
 }
-else {
+
+if ($args.Count -ge 2) {
    switch ($args[2]) {
       "-leng=es" {
          [array]$Language = LangStore -Language "es"
@@ -49,137 +53,57 @@ else {
          [array]$Language = LangStore -Language "en" 
       }
       $null {
-         [array]$Language = LangStore -Language "en" 
+         continue
       }
       default {
          Write-Host "`n[-] The langueage indicated not sopported.`n" -ForegroundColor "Red"
          exit
       }
    }
-
+   
    [string]$TarFile = $args[0].Substring(2)
    [string]$ArgumentOption = $args[1]
 }
 
+$docker = [Docker]::New()
 [string]$ContainerName = ("$TarFile" + "_container" -replace '.tar', '')
 [string]$image = ($TarFile -replace '.tar', '')
 
-function InstallDocker {
-   Write-Output $Language.InstallDocker[0]
-
-   try {
-      # There's a error of winget called 'Failed when searching source: msstore'
-      winget.exe install --id "Docker.DockerDesktop"
-      # If the error ocurred then install docker manually
-      if (-not $?) {
-         function InstallDockerManually {
-            Write-Output "`nThere's a error with your winget.exe"
-            [string]$Restart = Read-Host "`nYou want to Install docker manually (y/n)."
-
-            if ($Restart -eq "y") {  
-               [string]$DockerEncodeUrl = "Docker%20Desktop%20Installer.exe"
-               # Decode the url to obtain a legible url
-               [string]$DockerDecodeUrl = [System.Web.HttpUtility]::UrlDecode($DockerEncodeUrl)
-               # concat the string to format the link to download docker
-               Invoke-WebRequest -Uri "https://desktop.docker.com/win/main/amd64/$DockerEncodeUrl" -OutFile $DockerDecodeUrl
-               Write-Host "`nYou must click on next always.`n" -ForegroundColor "Magenta"
-               powershell.exe -c "Start-Process '$pwd\$DockerDecodeUrl'"
-               Write-Output "Again to execute the script after to install docker manually"
-               exit
-            }
-         }
-         else {
-            Write-Host $Language.InstallDocker[1] -ForegroundColor "Green"
-         }
-
-         InstallDockerManually
-      }
-   }
-   catch {
-      Write-Host $Language.InstallDocker[2] -ForegroundColor "Red"
-   }
-}
-
 function AnalysisSystemPrograms {
-   $WslInstance = [WslInstallationAndConfiguration]::New()
+   # Verify if we have administrator permissions
+   $CurrentTerminal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+   [bool]$IsAdministratorUser = $CurrentTerminal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
-   function VerifyPermissions {
-      # Verify if we have administrator permissions
-      $CurrentTerminal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-      [bool]$IsAdministratorUser = $CurrentTerminal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+   if ($IsAdministratorUser) {
+      #Verify if Docker exists on the system
+      [Wsl]::MainInstallWSL($Language)
 
-      if ($IsAdministratorUser) {
-         #Verify if Docker exists on the system
-         $WslInstance.MainInstallWSL($Language)
-
-         if (-not (Get-Command Docker -ErrorAction SilentlyContinue).Name) {
-            InstallDocker
-            #Activate the feature de hyper-v for that docker can run well
-            powershell.exe -c "dism /Online /Enable-Feature /All /FeatureName:Microsoft-Hyper-V"
-            [string]$SystemRestart = Read-Host -Prompt $Language.IntallingWSL[7]
-            if ($SystemRestart.ToLower() -eq "y") { shutdown.exe -r -t 5 } else { Write-Output $Language.IntallingWSL[8] }
-            exit
-         }
-      }
-      else {
-         Write-Host $Language.VerifyPermissions[0] -ForegroundColor "Red"
+      if (-not (Get-Command Docker -ErrorAction SilentlyContinue).Name) {
+         [Docker]::MainInstallDocker()
+         #Activate the feature de hyper-v for that docker can run well
+         powershell.exe -c "dism /Online /Enable-Feature /All /FeatureName:Microsoft-Hyper-V"
+         [string]$SystemRestart = Read-Host -Prompt $Language.IntallingWSL[7]
+         if ($SystemRestart.ToLower() -eq "y") { shutdown.exe -r -t 5 } else { Write-Output $Language.IntallingWSL[8] }
          exit
       }
    }
-
-   VerifyPermissions
-}
-
-
-function RemoveContainer {
-   if ($(docker ps -a -q -f name=$ContainerName -f status=exited)) {
-      docker rm $ContainerName
-   }
-
-   if (docker ps -q -f name=$ContainerName) {
-      docker stop $ContainerName 
-      docker rm $ContainerName 
-   }
-
-   if (docker images -q $image) {
-      docker rmi $image
-   }
-   
-   Write-Host "`n[+] The lab is deleted.`n" -ForegroundColor "Green"
-   
-   # Stop-Process -Name docker -Force
-}
-
-function CreateContainer {
-   (docker images 2>$null) > $null
-
-   if ($?) {
-      # Start-Process docker
-      Write-Output "`nDeploying the lab.`n"
-      docker load -i $TarFile
-   
-      if ($?) {
-         [string]$hash = docker run -d --name $ContainerName $image
-         Write-Output "`nThe hash of the container $ContainerName is $hash"
-         [string]$IpAddress = $(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $ContainerName)
-         Write-Host ($Language.CreateContainer[0] + $IpAddress) -ForegroundColor "Green"
-      }
-      else {
-         Write-Host $Language.CreateContainer[1] + "`n" -ForegroundColor "Red"
-      }
-   }
    else {
-      Write-Host "`n[-] Docker isn't turn on.`n" -ForegroundColor "Red"
+      Write-Host $Language.VerifyPermissions[0] -ForegroundColor "Red"
+      exit
    }
 }
 
 function Main {
    switch ($ArgumentOption) {
       "--run" {
-         CreateContainer
+         Write-Debug "$ContainerName, $image,$TarFile, $Language"
+         $docker.CreateContainer($ContainerName, $image, $TarFile, $Language)
+         # CreateContainer
       }
       "--remove" {
-         RemoveContainer
+         Write-Debug "$ContainerName, $image, $Language"
+         $docker.RemoveContainer($ContainerName, $image, $Language)
+         # RemoveContainer
       }
       "--test" {
          AnalysisSystemPrograms
@@ -187,22 +111,26 @@ function Main {
       }
       "--help" {
          function ShowOptions {
-            [HashTable]$HelpOptions = @{
+            # Suponiendo que $Language está definido en otro lugar del script
+            $HelpOptions = @{
                "--run"    = $Language.HelpOptions[0]
                "--remove" = $Language.HelpOptions[1]
                "--test"   = $Language.HelpOptions[2]
             }
-   
+        
             Write-Output $Language.Main[1]
-   
+        
             foreach ($key in $HelpOptions.Keys) {
                [string]$value = $HelpOptions[$key]
-               Write-Output ("{ 0, -10 } { 1 }" -f $key, $value)
+               Write-Output ("{0, -10} {1}" -f $key, $value)
             }
-   
+        
             Write-Output "`n"
          }
+        
+         # Llamada a la función
          ShowOptions
+        
       }
       $null {
          Write-Host $Language.Main[2] -ForegroundColor "Red"

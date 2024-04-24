@@ -1,9 +1,5 @@
-Import-Module .\lengStore.ps1 -Force
-
-class WslInstallationAndConfiguration {
-
-    hidden [void]VerifyIfExistWinget($Lang) {
-        $Language = LangStore -Language $Lang
+class Wsl {
+    hidden [void] IfWingetNotExistThenInstall($Language) {
         if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue).Name) {
             try {
                 Write-Output $Language.IntallingWSL[2]
@@ -15,7 +11,7 @@ class WslInstallationAndConfiguration {
 
                 # Open the executable to install winget manually
                 powershell.exe -c "Start-Process '$pwd\$ExecutableName'"
-                powershell.exe -c "DISM /Online /Enable-Feature /FeatureName:VirtualMachinePlatform /All /NoRestart"
+                powershell.exe -c "dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart"
                 Write-Output $Language.IntallingWSL[4]
                 exit
             }
@@ -27,9 +23,7 @@ class WslInstallationAndConfiguration {
         }
     }
 
-    [void]MainInstallWSL($Lang) {
-        $Language = LangStore -Language $Lang
-        
+    static [void] MainInstallWSL($Language) {
         [bool]$ExistUbuntu = $false
         foreach ($text in (wsl --list)) { if (-not ([string]$text -ne "Ubuntu (Default)")) { $ExistUbuntu = $true } }
         if (-not $ExistUbuntu) {
@@ -37,7 +31,7 @@ class WslInstallationAndConfiguration {
             Write-Host $Language.IntallingWSL[1] -ForegroundColor "Magenta"
             #Verify the installation and enablement of virtualization features.
             
-            VerifyIfExistWinget($Language)
+            IfWingetNotExistThenInstall($Language)
   
             try {
                 function ActivateFeatures {
