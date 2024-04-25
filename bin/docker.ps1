@@ -1,6 +1,11 @@
 class Docker {
     
     [void] CreateContainer ([string]$ContainerName, [string]$Image, [string]$TarFile, $Language) {
+
+        # The IP returned by Docker doesn't seem to respond, as it probably requires the Hyper-V feature, which is only available in Windows Pro or other versions besides Home.
+        # Without this feature, it's not possible to create a network interface that the machine can use to communicate with the local network.
+        # probably solution https://4sysops.com/archives/windows-container-networking-part-1-configuring-nat/
+
         (docker images 2>$null) > $null
  
         if ($?) {
@@ -48,9 +53,9 @@ class Docker {
 
         if ($Restart -eq "y") {  
             [string]$DockerEncodeUrl = "Docker%20Desktop%20Installer.exe"
-            # Decode the url to obtain a legible url
+            # Decode the URL to obtain a readable URL
             [string]$DockerDecodeUrl = [System.Web.HttpUtility]::UrlDecode($DockerEncodeUrl)
-            # concat the string to format the link to download docker
+            # Concatenate the string to format the link to download Docker
             Invoke-WebRequest -Uri "https://desktop.docker.com/win/main/amd64/$DockerEncodeUrl" -OutFile $DockerDecodeUrl
             Write-Host "`nYou must click on next always.`n" -ForegroundColor "Magenta"
             powershell.exe -c "Start-Process '$pwd\$DockerDecodeUrl'"
@@ -63,9 +68,9 @@ class Docker {
     static [void] MainInstallDocker ($Language) {
         Write-Output $Language.InstallDocker[0]
         try {
-            # There's a error of winget called 'Failed when searching source: msstore'
+            # There's an error with Winget called 'Failed when searching source: msstore
             winget.exe install --id "Docker.DockerDesktop" 2> $null
-            # If the error ocurred then install docker manually
+            # If the error occurred, then install Docker manually
             if (-not $?) {
                 InstallDockerManually
             }

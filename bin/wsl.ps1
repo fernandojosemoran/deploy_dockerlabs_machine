@@ -5,7 +5,7 @@ class Wsl {
                 Write-Output $Language.IntallingWSL[2]
                 Write-Output $Language.IntallingWSL[3]
                 
-                #Install WSL if isn't installed
+                # Install WSL if it isn't installed
                 [string]$ExecutableName = "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
                 Invoke-WebRequest -Uri "https://github.com/microsoft/winget-cli/releases/download/v1.7.3452-preview/$ExecutableName" -OutFile $ExecutableName
 
@@ -29,7 +29,6 @@ class Wsl {
         if (-not $ExistUbuntu) {
             Write-Output $Language.IntallingWSL[0]
             Write-Host $Language.IntallingWSL[1] -ForegroundColor "Magenta"
-            #Verify the installation and enablement of virtualization features.
             
             IfWingetNotExistThenInstall($Language)
   

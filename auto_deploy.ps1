@@ -75,12 +75,12 @@ function AnalysisSystemPrograms {
    [bool]$IsAdministratorUser = $CurrentTerminal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
    if ($IsAdministratorUser) {
-      #Verify if Docker exists on the system
+      # Verify if Docker exists on the system
       [Wsl]::MainInstallWSL($Language)
 
       if (-not (Get-Command Docker -ErrorAction SilentlyContinue).Name) {
          [Docker]::MainInstallDocker()
-         #Activate the feature de hyper-v for that docker can run well
+         # Activate the Hyper-V feature so that Docker can run properly
          powershell.exe -c "dism /Online /Enable-Feature /All /FeatureName:Microsoft-Hyper-V"
          [string]$SystemRestart = Read-Host -Prompt $Language.IntallingWSL[7]
          if ($SystemRestart.ToLower() -eq "y") { shutdown.exe -r -t 5 } else { Write-Output $Language.IntallingWSL[8] }
@@ -98,12 +98,10 @@ function Main {
       "--run" {
          Write-Debug "$ContainerName, $image,$TarFile, $Language"
          $docker.CreateContainer($ContainerName, $image, $TarFile, $Language)
-         # CreateContainer
       }
       "--remove" {
          Write-Debug "$ContainerName, $image, $Language"
          $docker.RemoveContainer($ContainerName, $image, $Language)
-         # RemoveContainer
       }
       "--test" {
          AnalysisSystemPrograms
@@ -111,7 +109,6 @@ function Main {
       }
       "--help" {
          function ShowOptions {
-            # Suponiendo que $Language está definido en otro lugar del script
             $HelpOptions = @{
                "--run"    = $Language.HelpOptions[0]
                "--remove" = $Language.HelpOptions[1]
@@ -127,10 +124,7 @@ function Main {
         
             Write-Output "`n"
          }
-        
-         # Llamada a la función
          ShowOptions
-        
       }
       $null {
          Write-Host $Language.Main[2] -ForegroundColor "Red"
